@@ -64,29 +64,36 @@ SmartCook adalah aplikasi resep masakan full-stack yang membantu pengguna menemu
 ```
 SmartCook/
 ├── smartcook-frontend/          # Flutter mobile application
-│   ├── lib/                     # Source code
+│   ├── lib/                     # Source code (lihat repo frontend)
 │   ├── pubspec.yaml             # Dependencies
-│   ├── README.md                # Frontend documentation
-│   └── LICENSE                  # Frontend license
+│   ├── README.md                # Frontend documentation (di repo frontend)
+│   └── LICENSE                  # Frontend license (di repo frontend)
 │
 ├── smartcook-backend/           # Node.js REST API
-│   ├── src/                     # Source code
+│   ├── src/                     # Source code (lihat repo backend)
 │   ├── server.js               # Entry point
 │   ├── package.json            # Dependencies
-│   ├── README.md               # Backend documentation
-│   └── LICENSE                 # Backend license
+│   ├── README.md               # Backend documentation (di repo backend)
+│   └── LICENSE                 # Backend license (di repo backend)
 │
 ├── README.md                   # Dokumentasi utama (file ini)
 ├── .gitignore                  # Git ignore rules
 └── LICENSE                     # Root license
 ```
 
+## 🔗 Repositori GitHub
+
+- **Backend**: https://github.com/Sadamdi/smartcook-backend  
+- **Frontend**: https://github.com/ChillGuyAdit/smartcook-frontend  
+
+Dokumentasi lengkap (README, LICENSE, dan file terkait lainnya) untuk masing-masing bagian ada di repo GitHub tersebut.
+
 ## 📚 Dokumentasi
 
 Untuk dokumentasi lengkap tentang masing-masing bagian proyek, silakan baca:
 
-- **[📱 Frontend Documentation](smartcook-frontend/README.md)** - Dokumentasi lengkap tentang aplikasi Flutter, fitur, alur aplikasi, instalasi, dan setup
-- **[⚙️ Backend Documentation](smartcook-backend/README.md)** - Dokumentasi lengkap tentang REST API, endpoints, database schema, security, dan deployment
+- **[📱 Frontend Documentation](https://github.com/ChillGuyAdit/smartcook-frontend)** - Dokumentasi lengkap tentang aplikasi Flutter, fitur, alur aplikasi, instalasi, dan setup
+- **[⚙️ Backend Documentation](https://github.com/Sadamdi/smartcook-backend)** - Dokumentasi lengkap tentang REST API, endpoints, database schema, security, dan deployment
 
 ## 🚀 Quick Start
 
@@ -133,7 +140,7 @@ Untuk dokumentasi lengkap tentang masing-masing bagian proyek, silakan baca:
    npm start
    ```
 
-Lihat [Backend Documentation](smartcook-backend/README.md) untuk detail lengkap.
+Lihat [Backend Documentation](https://github.com/Sadamdi/smartcook-backend) untuk detail lengkap.
 
 ### Instalasi Frontend
 
@@ -164,7 +171,7 @@ Lihat [Backend Documentation](smartcook-backend/README.md) untuk detail lengkap.
    flutter run
    ```
 
-Lihat [Frontend Documentation](smartcook-frontend/README.md) untuk detail lengkap.
+Lihat [Frontend Documentation](https://github.com/ChillGuyAdit/smartcook-frontend) untuk detail lengkap.
 
 ## ✨ Fitur Utama
 
@@ -293,7 +300,7 @@ flutter run    # Run di device/emulator
 - Gunakan HTTPS (SSL/TLS)
 - Konfigurasi rate limiting sesuai traffic
 
-Lihat [Backend Documentation](smartcook-backend/README.md) untuk detail deployment.
+Lihat [Backend Documentation](https://github.com/Sadamdi/smartcook-backend) untuk detail deployment.
 
 ### Frontend Deployment
 - Build APK untuk Android:
@@ -401,5 +408,5 @@ Terima kasih kepada semua kontributor yang telah membantu dalam pengembangan apl
 **SmartCook** - Temukan resep masakan terbaik untukmu! 🍳
 
 Untuk dokumentasi lengkap, silakan baca:
-- [📱 Frontend Documentation](smartcook-frontend/README.md)
-- [⚙️ Backend Documentation](smartcook-backend/README.md)
+- [📱 Frontend Documentation](https://github.com/ChillGuyAdit/smartcook-frontend)
+- [⚙️ Backend Documentation](https://github.com/Sadamdi/smartcook-backend)
