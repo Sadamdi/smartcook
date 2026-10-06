@@ -188,6 +188,54 @@ published GitHub asset sizes equal the local file sizes.
 - **Any await on the splash path needs a failure route.** It used to have none,
   so a single error left the user on a white screen with no way forward.
 
+## Developer debug log (telemetry)
+
+Answers "which phone, which build, which action, what error" for a bug report
+without asking the user to run anything. **Not a user-facing feature — keep it
+out of release notes.**
+
+Client: `smartcook-frontend/lib/core/services/dev_log.dart`, posting batches to
+`POST /api/devlog/ingest`. Server: `smartcook-backend/src/modules/devlog/`.
+
+Captured per event: app launch/resume, failed API calls (path + status), render
+errors, unhandled Flutter errors, session handshake outcome, language switch.
+Each row carries device model, manufacturer, OS version, SDK level, ABI, device
+locale, app version, build, plus the server's view — real client IP, user
+agent, signing certificate. With a valid `X-User-Token` the account is attached.
+
+Queries are made from the server shell, e.g.:
+
+```bash
+cd /root/smartcook-backend && node -e "
+require('dotenv').config();
+const mongoose=require('mongoose');
+const DevLog=require('./src/modules/devlog/model');
+(async()=>{ await mongoose.connect(process.env.MONGODB_URI);
+  const rows=await DevLog.find({level:'error'}).sort({createdAt:-1}).limit(20).lean();
+  for(const r of rows) console.log(r.createdAt.toISOString(), r.event, r.action,
+    '|', r.deviceManufacturer, r.deviceModel, 'os'+r.osVersion, 'b'+r.appBuild,
+    '|', (r.error||'').slice(0,80));
+  await mongoose.disconnect(); })();
+"
+```
+
+Useful filters: `event`, `level`, `installId`, `userId`, `appBuild`, `createdAt`.
+
+Rules that must stay true:
+
+- **Retention is 30 days** (`DEVLOG_RETENTION_DAYS`), enforced by a MongoDB TTL
+  index on `expiresAt`. `expiresAt` is `required`, not defaulted: a TTL index
+  silently ignores documents missing the field, so a default would keep rows
+  forever.
+- **Identity is never read from the payload.** It comes from the verified token,
+  so a modified client cannot log events as another user.
+- `/api/devlog/ingest` must stay in `OPEN_PATHS` in `server.js`. A crash during
+  boot happens *before* the handshake, and those are the events worth having.
+- Event names are allow-listed and every string is length-capped.
+- Wire keys are single letters. **If you change one, change `WIRE` in
+  `src/modules/devlog/service.js` and `_k*` in `dev_log.dart` together** — a
+  mismatch silently drops every event (`accepted:0, rejected:N`).
+
 ## Localisation
 
 `lib/core/l10n/strings.dart` holds a `Str` interface with hand-written `StrId`
