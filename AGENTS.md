@@ -174,6 +174,19 @@ published GitHub asset sizes equal the local file sizes.
 - **Play Protect blocks sideloaded updates on the emulator.** If installing the
   downloaded APK fails with `INSTALL_FAILED_VERIFICATION_FAILURE`, that is the
   emulator, not the release.
+- **`adb install` can report Success without updating the app.** Check
+  `dumpsys package com.example.smartcook | grep lastUpdateTime` before trusting
+  a test result. Uninstall first when the signature changes.
+- **uiautomator cannot read Flutter text.** A Flutter screen with many widgets
+  dumps zero text nodes; that is not proof of a blank screen. Sample screenshot
+  pixels instead (`distinct colours` > 1 means it rendered).
+- **Dio throws on non-2xx before the body is readable.** Any check that needs
+  the error body (`code` like `FORBIDDEN_CLIENT`) must set
+  `validateStatus: (s) => s < 500`, otherwise it is misread as a network fault.
+- **Never change `locale` while a dialog is open.** It rebuilds MaterialApp and
+  tears the dialog down mid-`Navigator.pop`. Pop first, switch on the next frame.
+- **Any await on the splash path needs a failure route.** It used to have none,
+  so a single error left the user on a white screen with no way forward.
 
 ## Localisation
 
