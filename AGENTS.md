@@ -236,6 +236,65 @@ Rules that must stay true:
   `src/modules/devlog/service.js` and `_k*` in `dev_log.dart` together** — a
   mismatch silently drops every event (`accepted:0, rejected:N`).
 
+## Version numbering (`pubspec.yaml:version`)
+
+| Bump | Contoh | Kapan | Mandatory |
+| --- | --- | --- | --- |
+| PATCH | `1.0.10+11` → `1.0.11+12` | bug fix, teks, performa, keamanan minor | opsional |
+| MINOR | `1.0.x` → `1.1.0` | fitur baru kecil/sedang | opsional |
+| BIG | `1.x` → `1.5.0` → `2.0.0` | paket fitur besar / redesign | opsional (wajib: gunakan BIG kalau redesign major) |
+| MAJOR | `2.0.0+0` → `3.0.0+0` | rewrite, API break | **wajib** |
+
+Build number (`+N`) **selalu naik**. Tidak pernah reuse, tidak pernah turun.
+A `pubspec.yaml` dengan `+N` lebih kecil dari rilis yang sudah diterbitkan
+ditolak oleh server, dan Android sendiri menolak downgrade tanpa uninstall
+manual dulu.
+
+Default `mandatory` di manifest baru: `false`, kecuali `type=major` yang
+`true`. Bisa dipaksa ke `true` lewat `minBuild` untuk keamanan darurat.
+
+## Release notes (frontend user-facing)
+
+Catatan rilis user-facing hidup di
+`smartcook-frontend/release-notes/<build>-<version>.md`. Bahasa Indonesia,
+nada sopan, **tanpa jargon internal**:
+
+- Tidak ada nama developer, commit hash, atau referensi ke file.
+- Tidak ada kata "server", "token", "fingerprint", "debug log",
+  "telemetry", "fix", "bug", "Crashlytics".
+- Bullet ringkas, satu kalimat, tidak semuanya mulai dengan kata yang sama.
+- Maksimal 3-4 poin per section (Yang baru, Perbaikan, dst).
+- Tidak ada emoji berlebihan; kalau pakai, satu saja.
+
+Format file (frontmatter YAML + body):
+
+```
+---
+version: 1.0.12
+build: 27
+date: 2026-10-07
+type: minor
+mandatory: false
+sections:
+  - kind: new
+    items:
+      - Tambah mode dapur dengan timer built-in, tidak perlu lagi pakai HP kedua saat masak.
+      - Rekomendasi resep sekarang menghargai diet user: vegetarian, vegan, rendah gula.
+  - kind: fix
+    items:
+      - Login Google tidak lagi gagal saat akun HP baru pertama kali ditautkan.
+      - ...
+---
+Headline satu kalimat tentang rilis ini.
+
+The rest of the body is shown when the user taps "See full notes".
+```
+
+Manifest server (`/root/smartcook-releases/latest.json`) menerima field
+`headline` + `sections[]` dan menurunkan body field `notes` lama jadi ringkasan,
+jadi rilis-rilis lama masih tetap tampil layak sampai keluar dari window
+history.
+
 ## Localisation
 
 `lib/core/l10n/strings.dart` holds a `Str` interface with hand-written `StrId`
