@@ -47,73 +47,51 @@ a stale `app-release.apk` from a previous run will still be sitting in
 
 ## Releasing a new version
 
-1. Bump the version in `pubspec.yaml` (`version: X.Y.Z+N`, `N` strictly
-   increasing). Never reuse a build number — Android refuses to install a
-   lower `versionCode` over an existing one.
+All releases go through **one** script: `smartcook-frontend/scripts/release.ps1`
+(full guide: `smartcook-frontend/docs/RELEASING.md`). Do not hand-edit
+`latest.json` on the VPS and do not run `build_release_manifest.py` there.
 
-2. Build both ABIs:
+```powershell
+cd smartcook-frontend
+.\scripts\release.ps1 -Type patch      # patch | minor | big | major
+```
 
-   ```powershell
-   cd smartcook-frontend
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build_android_release.ps1
-   ```
+1. First run creates `release-notes/<build>-<version>.md` and stops. Fill it in
+   (rules below), run the same command again.
+2. The script bumps `pubspec.yaml` (`+N` rises by exactly 1), builds arm64 +
+   arm32 via `build_android_release.ps1` (asserts `versionCode == +N`), checks
+   the release signature, generates `latest.json` (it refuses if the newest note
+   is not the pubspec build), uploads atomically, keeps only the current and
+   previous APKs on the server, then commits, tags `app-vX.Y.Z+N` and pushes.
+3. Commit the submodule pointers in the superproject.
+4. Run the checks in "Verifying a release". A release is **not done** until they pass.
 
-   Output: `build/releases/smartcook-X.Y.Z+N-arm64.apk` and `-arm32.apk`.
-   Confirm the script printed `OK versionCode=N` twice.
+**One number.** `pubspec +N` = Android `versionCode` = `latest.json` `build` =
+the number in the note's file name. There is no second numbering scheme (v1.0.0 -
+v1.0.13 shipped with manifest builds 17-28 against versionCodes 1-14, so every
+phone was "behind" and forced to update; fixed 2026-10-08). `minBuild` is
+computed from notes with `mandatory: true`; `blocks: [..]` fills `blockedBuilds`.
 
-3. Commit and push the code, then upload the APKs to the server:
+Other modes: `-PublishOnly` (re-publish current build), `-Rollback -To X.Y.Z
+-Block N` (roll forward from tag `app-vX.Y.Z+*`; Android cannot downgrade),
+`-Unpublish` (restore previous `latest.json`).
 
-   ```powershell
-   cd smartcook-frontend
-   git add -A && git commit -m "[chore] release X.Y.Z+N"
-   git push origin main
-   ```
+### Definition of done for anything user-facing
 
-4. Publish `/root/smartcook-releases/latest.json` on the VPS. Keep every field
-   consistent — `build`, `minBuild`, and each `sha256` must match reality:
+- Released through `release.ps1` (never a manual upload).
+- Release note written and committed (`release-notes/` is tracked; never ignore it).
+- Only app changes appear in notes. Server/backend changes (API, database,
+  push, email) go in the backend's own docs, and a backend-only change needs
+  no APK.
+- All touched repos committed and pushed to `main`, tag pushed, submodule
+  pointers committed.
+- Server verified (next section).
 
-   ```json
-   {
-     "version": "1.0.10",
-     "build": 11,
-     "minBuild": 11,
-     "blockedBuilds": [],
-     "releaseType": "patch",
-     "date": "2026-10-07",
-     "notes": "One-paragraph summary shown in the update dialog.",
-     "apks": [
-       { "abi": "arm64", "file": "smartcook-1.0.10-arm64.apk", "sha256": "<sha256>", "sizeBytes": 0 },
-       { "abi": "arm32", "file": "smartcook-1.0.10-arm32.apk", "sha256": "<sha256>", "sizeBytes": 0 }
-     ],
-     "history": [ { "version": "1.0.10", "build": 11, "date": "...", "type": "patch", "notes": "..." } ]
-   }
-   ```
+### Data safety
 
-   `history` is what the in-app changelog sheet renders, newest first. Add an
-   entry for every release, including patch releases.
-
-   `minBuild` is the floor below which the update is **mandatory** (dialog
-   cannot be dismissed). Set it equal to `build` for a normal release. Raise it
-   above `build` only for a security fix that must land immediately.
-
-5. Copy the APKs into `smartcook-frontend/releases/` so they are downloadable
-   from GitHub, and create the GitHub Release. `gh` is authenticated as
-   `Sadamdi`.
-
-   ```powershell
-   Copy-Item build\releases\smartcook-X.Y.Z+N-arm64.apk releases\
-   Copy-Item build\releases\smartcook-X.Y.Z+N-arm32.apk releases\
-   git add releases\ && git commit -m "[chore] release X.Y.Z+N"
-   git push origin main
-   gh release create vX.Y.Z --title "SmartCook Android X.Y.Z" `
-     --notes-file <file> `
-     "releases/smartcook-X.Y.Z+N-arm64.apk" "releases/smartcook-X.Y.Z+N-arm32.apk"
-   ```
-
-6. Finally, commit the submodule pointers in the superproject so the parent
-   repo references the right commits.
-
----
+Read a script before running it (`deleteMany`, `DROP`, `TRUNCATE`, `rm -rf`).
+Never run anything that bulk-deletes or resets data against the production
+MongoDB without an explicit "yes" for that one command, and back up first.
 
 ## Verifying a release
 
@@ -271,7 +249,7 @@ Format file (frontmatter YAML + body):
 ```
 ---
 version: 1.0.12
-build: 27
+build: 13
 date: 2026-10-07
 type: minor
 mandatory: false
