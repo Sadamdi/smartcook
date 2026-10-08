@@ -93,6 +93,26 @@ Read a script before running it (`deleteMany`, `DROP`, `TRUNCATE`, `rm -rf`).
 Never run anything that bulk-deletes or resets data against the production
 MongoDB without an explicit "yes" for that one command, and back up first.
 
+## Backend auto-deploy
+
+A push to `smartcook-backend` `main` reaches the VPS in about a minute: the
+`smartcook-deploy.timer` systemd unit runs `scripts/deploy.sh` (fetch, reset,
+`npm ci` if `package*.json` changed, syntax check, `pm2 restart`, health check,
+automatic rollback). Details: `smartcook-backend/deploy/README.md`. Log:
+`/root/smartcook-deploy.log`. Pause with `systemctl disable --now smartcook-deploy.timer`.
+
+- **Never edit files on the VPS by hand.** The next deploy resets tracked files
+  to GitHub. To hot-fix, push to `main` instead.
+- **Never track a file the API writes** (`data/*.json`, uploads, state). A
+  `reset --hard` would overwrite live state with the repo copy. `data/` is untracked.
+- `package-lock.json` is tracked and must be generated with the VPS's npm
+  (10.x). A lock from a newer local npm makes `npm ci` fail and the deploy rolls
+  back (this happened on the first deploy). If you change dependencies, run
+  `npm install --package-lock-only` on the VPS in a temp copy and commit that lock.
+- A rolled-back commit is listed in `/root/.smartcook-bad-commits` and is not
+  retried; push a new commit to try again.
+- This covers the backend only. APKs go through `release.ps1`.
+
 ## Verifying a release
 
 Never assume. Check these:
