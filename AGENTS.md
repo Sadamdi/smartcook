@@ -119,6 +119,14 @@ real users, and changes that need a secret only the owner has.
 Backend-only changes need no APK: push to `main` and the auto-deploy ships
 them after the same recheck/test steps.
 
+### Emulator hygiene
+
+The Android emulator eats RAM. Start it only for the check that needs it and
+**shut it down (`adb emu kill`) as soon as that work is truly finished**, then
+confirm no `qemu-system*`/`emulator*` process is left. Release APKs are arm
+only; for an emulator build use `flutter build apk --release --target-platform
+android-x64` (release-signed, so the handshake is accepted) and never publish it.
+
 ### Data safety
 
 - Read a script before running it (`deleteMany`, `DROP`, `TRUNCATE`, `rm -rf`).
@@ -146,6 +154,50 @@ them after the same recheck/test steps.
 - Also back up, outside git: the release keystore + `android/key.properties`
   (losing the keystore means no existing install can ever be updated) and the
   Firebase service-account json.
+
+## Encrypted API channel (all endpoints)
+
+HTTPS ends at Cloudflare, which can read every request. The app therefore seals
+**every API request and its answer** to the server's public key (X25519 +
+HKDF-SHA256 + AES-256-GCM, ephemeral key per request). Cloudflare only sees
+`POST /api/secure` with random bytes. Code: `smartcook-backend/src/modules/secure/channel.js`
+(server) and `smartcook-frontend/lib/core/services/secure_channel.dart`
+(`SecureHttpClient` for `ApiService`/chat, `SecureDioInterceptor` for the
+session endpoints). Change both sides together.
+
+- The private key is `API_PRIVATE_KEY` in the server `.env` (and, as a backup
+  copy, the laptop `.env`). The app holds only the public key + `kid`
+  (`API_PUBLIC_KEY` / `API_KEY_ID` dart-defines override the defaults).
+- Stays plaintext on purpose: `GET /api/app/*` (update check/download, so an old
+  or blocked app can always see the update dialog), `GET /api/health`,
+  `POST /api/devlog/ingest` (own envelope). Same list on both sides.
+- Provides confidentiality, integrity and replay protection (5 min window +
+  nonce cache). It does **not** authenticate the client; the public key is in
+  the APK. The handshake/session gates still apply inside the channel.
+- **Rollout.** The server accepts plaintext AND sealed requests until
+  `API_REQUIRE_ENCRYPTED=1`. Old apps keep working. To make encryption
+  mandatory: (1) check adoption (live sessions by build, see below), (2) ship a
+  release with `mandatory: true` / raised `minBuild` for the first sealed build
+  (this needs the owner's explicit OK, see Standing release approval),
+  (3) set `API_REQUIRE_ENCRYPTED=1` in the server `.env` and restart PM2. After
+  that every plaintext call except the exempt ones answers 426
+  `UPDATE_REQUIRED`, whose message the old app shows to the user.
+- **Key rotation.** Generate a new pair on the server, put the NEW private key in
+  `API_PRIVATE_KEY` and the old one in `API_PRIVATE_KEY_PREV`, ship an app with
+  the new public key/`kid`, and drop `_PREV` only when old builds have aged out.
+- A phone clock off by more than 5 minutes is handled: the client learns the
+  offset from the server and retries once.
+- `SECURE_API=false` (dart-define) turns sealing off for development against a
+  server without the key. Never ship that.
+- Tests (run all before touching it): backend `node scripts/test-secure-channel.js`;
+  frontend `flutter test` (unit) plus the cross-language interop run, which
+  starts the real Node stack: `scripts/secure-interop-server.js` with
+  `INTEROP_API_PRIVATE_KEY`, then `flutter test test/secure_channel_interop_test.dart`
+  with `SECURE_INTEROP_URL`, `SECURE_INTEROP_STRICT_URL`, `SECURE_INTEROP_PUB`,
+  `SECURE_INTEROP_KID` set.
+- Adoption check (read-only), run on the VPS: count live app sessions by build,
+  e.g. in `/root/smartcook-backend` query the `apptokens` collection grouped by
+  `build`. Builds below the first sealed build are still plaintext.
 
 ## Verifying a release
 
