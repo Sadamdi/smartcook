@@ -87,31 +87,65 @@ Other modes: `-PublishOnly` (re-publish current build), `-Rollback -To X.Y.Z
   pointers committed.
 - Server verified (next section).
 
+### Standing release approval (owner, 2026-10-08)
+
+The owner has **pre-approved releasing** after a change is rechecked. An agent
+that finishes a user-facing change does not need to ask "shall I release?" -
+it runs the checklist below and, if every item passes, releases (APK via
+`release.ps1`, then verifies). The agent reports what it released afterwards.
+
+Checklist, in this order. Stop and tell the owner if any item fails:
+
+1. **Recheck.** Re-read your own diff and look for the same class of bug next
+   to what you changed (a fix is not done until its neighbours were looked at).
+2. **Test.** Frontend: `flutter analyze lib` has 0 errors and 0 warnings, and
+   `flutter test` passes if tests exist. Backend: `node --check` on touched
+   files plus a unit/behaviour test for new logic (never run anything that
+   writes to the production database; see Data safety).
+3. **Commit and push** every touched repo to `main`; the working tree is clean.
+4. **Release note** written and committed (rules in "Release notes"): app
+   changes only, Indonesian, no internal jargon.
+5. **Release** with `release.ps1 -Type patch|minor` (see above). Create the
+   GitHub Release with both APKs.
+6. **Verify** on the VPS ("Verifying a release"): current build is not
+   mandatory, the previous build gets the optional update, hashes and sizes
+   match, `/api/health` is OK. Then commit the submodule pointers.
+
+Still ask first (this approval does **not** cover them): a `major` release, a
+`mandatory: true` / raised `minBuild`, a rollback, any database migration or
+bulk delete, rotating tokens or keys, anything that spends money or messages
+real users, and changes that need a secret only the owner has.
+
+Backend-only changes need no APK: push to `main` and the auto-deploy ships
+them after the same recheck/test steps.
+
 ### Data safety
 
-Read a script before running it (`deleteMany`, `DROP`, `TRUNCATE`, `rm -rf`).
-Never run anything that bulk-deletes or resets data against the production
-MongoDB without an explicit "yes" for that one command, and back up first.
+- Read a script before running it (`deleteMany`, `DROP`, `TRUNCATE`, `rm -rf`).
+- **The laptop `.env` is a copy of the server's, so it points at PRODUCTION
+  MongoDB.** Anything you run locally that writes (`npm run seed`, a test, a
+  one-off script) writes to production. `src/seed.js` now refuses any
+  non-local `MONGODB_URI` unless `SEED_CONFIRM_WIPE=<host>` is set, and it
+  deletes every recipe and ingredient: back up first. Never run anything that
+  bulk-deletes or resets data against production without an explicit "yes"
+  from the owner for that one command.
+- No scheduled MongoDB backup exists yet; take one (`mongodump`) before any
+  bulk write.
 
-## Backend auto-deploy
+### Secrets and `.env`
 
-A push to `smartcook-backend` `main` reaches the VPS in about a minute: the
-`smartcook-deploy.timer` systemd unit runs `scripts/deploy.sh` (fetch, reset,
-`npm ci` if `package*.json` changed, syntax check, `pm2 restart`, health check,
-automatic rollback). Details: `smartcook-backend/deploy/README.md`. Log:
-`/root/smartcook-deploy.log`. Pause with `systemctl disable --now smartcook-deploy.timer`.
-
-- **Never edit files on the VPS by hand.** The next deploy resets tracked files
-  to GitHub. To hot-fix, push to `main` instead.
-- **Never track a file the API writes** (`data/*.json`, uploads, state). A
-  `reset --hard` would overwrite live state with the repo copy. `data/` is untracked.
-- `package-lock.json` is tracked and must be generated with the VPS's npm
-  (10.x). A lock from a newer local npm makes `npm ci` fail and the deploy rolls
-  back (this happened on the first deploy). If you change dependencies, run
-  `npm install --package-lock-only` on the VPS in a temp copy and commit that lock.
-- A rolled-back commit is listed in `/root/.smartcook-bad-commits` and is not
-  retried; push a new commit to try again.
-- This covers the backend only. APKs go through `release.ps1`.
+- `.env` is **never committed** (gitignored) and **never deployed by git**: the
+  auto-deploy leaves it alone.
+- The owner wants the laptop `.env` identical to the server's, as a backup for
+  moving servers. The server is the source of truth. After any change on the
+  server run `smartcook-backend\scripts\pull-env.ps1`; it keeps the previous
+  file as `.env.pre-sync.local` and never pushes anything to the server.
+- Because the laptop now holds production secrets (including
+  `DEVLOG_PRIVATE_KEY`), keep the disk encrypted (BitLocker) and never paste
+  `.env` contents into chat, tickets or commits.
+- Also back up, outside git: the release keystore + `android/key.properties`
+  (losing the keystore means no existing install can ever be updated) and the
+  Firebase service-account json.
 
 ## Verifying a release
 
@@ -230,6 +264,23 @@ Rules that must stay true:
 - `/api/devlog/ingest` must stay in `OPEN_PATHS` in `server.js`. A crash during
   boot happens *before* the handshake, and those are the events worth having.
 - Event names are allow-listed and every string is length-capped.
+- **Batches are encrypted** (X25519 + HKDF-SHA256 + AES-256-GCM sealed box,
+  `smartcook-backend/src/modules/devlog/crypto.js`). The app holds only the
+  server PUBLIC key; the private key is `DEVLOG_PRIVATE_KEY` in the server
+  `.env`. Each batch has its own ephemeral key; `kid` allows rotation (put the
+  old key in `DEVLOG_PRIVATE_KEY_PREV` until old APKs age out). Plaintext
+  batches from old APKs are accepted until `DEVLOG_REQUIRE_ENCRYPTED=1`.
+  Encryption gives confidentiality and integrity, not authenticity: a modified
+  client can still send bogus (size-capped, allow-listed) events. Run
+  `node scripts/test-devlog-crypto.js` and `scripts/test-devlog-ingest.js`
+  after touching it.
+- **Privacy in logs.** The collection stores only the opaque `userId` (no name,
+  no email) and the client IP masked to /24. Raw PM2 logs are redacted by
+  `src/utils/redact.js` (emails become `email:<hash>`, IPv4 keeps /24) and
+  `pm2-logrotate` rotates daily and keeps 30 files, so nothing outlives 30
+  days. Never log request/response bodies, tokens, OTPs or typed text.
+- Retention is verified, not assumed: the TTL index on `expiresAt` exists and
+  no row lacks `expiresAt`.
 - Wire keys are single letters. **If you change one, change `WIRE` in
   `src/modules/devlog/service.js` and `_k*` in `dev_log.dart` together** — a
   mismatch silently drops every event (`accepted:0, rejected:N`).
