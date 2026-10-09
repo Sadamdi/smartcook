@@ -396,6 +396,36 @@ Manifest server (`/root/smartcook-releases/latest.json`) menerima field
 jadi rilis-rilis lama masih tetap tampil layak sampai keluar dari window
 history.
 
+## Server messages and e-mails follow the app language
+
+The app sends `X-Smartcook-Locale` (`id`/`en`) on every API call (it travels
+inside the sealed channel too). `smartcook-backend/src/utils/i18n.js` swaps the
+`message` of each JSON answer for its English text and `sendOTPEmail` takes
+`lang`, so OTP e-mails and errors such as "Kode OTP salah." match the language
+the user picked. Controllers keep writing Indonesian; **every new message needs
+an entry in `EN` in `i18n.js`** (and both languages in the e-mail templates).
+`node scripts/test-i18n.js` fails when a message in `src/` has no English text.
+
+## Backend auto-deploy and pm2
+
+systemd runs `scripts/deploy.sh` without `HOME`; unpinned, `pm2` talks to an
+empty daemon and a deploy "succeeds" without restarting (fixed 2026-10-09: the
+unit and script pin `PM2_HOME=/root/.pm2`, a failed restart fails the deploy).
+After a backend push, confirm the process uptime reset (`pm2 jlist`).
+
+## 16 KB page size (Android 15+)
+
+What Google Play checks passes: every arm64 library has `p_align` >= 16 KB and
+the zip passes `zipalign -c -P 16 -v 4 <apk>` (checked 2026-10-09 on 1.1.2).
+Flutter 3.44, AGP 8.11, NDK 28 and androidx.datastore 1.2.0 (latest) are already
+the 16 KB-ready versions. The runtime dialog "This app isn't 16 KB compatible"
+still shows on the 16 KB x86_64 emulator image for the dev build; it names
+`libdatastore_shared_counter.so` (AndroidX prebuilt, its RELRO end is not
+16 KB aligned and we cannot rebuild it) plus engine/jni libs. A real 16 KB ARM
+phone cannot be tested from this machine, so re-check after any Flutter, AGP or
+plugin upgrade (`zipalign` + ELF `p_align`/`PT_GNU_RELRO`) and bump androidx
+datastore when a newer one ships.
+
 ## Localisation
 
 `lib/core/l10n/strings.dart` holds a `Str` interface with hand-written `StrId`
