@@ -182,6 +182,10 @@ session endpoints). Change both sides together.
   (3) set `API_REQUIRE_ENCRYPTED=1` in the server `.env` and restart PM2. After
   that every plaintext call except the exempt ones answers 426
   `UPDATE_REQUIRED`, whose message the old app shows to the user.
+- **Status (2026-10-10): `API_REQUIRE_ENCRYPTED=1` is ON** on the server (and the
+  laptop copy). Plaintext calls other than the exempt ones answer 426. Builds
+  below `minBuild` still reach the update dialog through the plaintext
+  `GET /api/app/*` endpoints. To roll back, remove the line and restart PM2.
 - **Key rotation.** Generate a new pair on the server, put the NEW private key in
   `API_PRIVATE_KEY` and the old one in `API_PRIVATE_KEY_PREV`, ship an app with
   the new public key/`kid`, and drop `_PREV` only when old builds have aged out.
