@@ -193,3 +193,8 @@ desktop.ini
 .svn/
 .swiftpm/
 migrate_working_dir/
+
+# Signing material must never be committed
+signing/
+*.jks
+*.keystore
